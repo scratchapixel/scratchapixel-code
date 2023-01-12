@@ -35,7 +35,7 @@
 #include "geometry.h"
 
 #include <fstream>
-
+#define M_PI 3.1415926
 //[comment]
 // List of vertices making up the object
 //[/comment]

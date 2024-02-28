@@ -141,7 +141,7 @@ void CreateAndRegisterWindow(HINSTANCE hInstance) {
 	wc.hCursor = LoadCursor(nullptr, IDC_ARROW); // Set the default arrow cursor
 	wc.hIcon = LoadIcon(hInstance, IDI_APPLICATION); // Load the default application icon
 	wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-    wc.lpszMenuName = nullptr;
+	wc.lpszMenuName = nullptr;
 	wc.hIconSm = LoadIcon(hInstance, IDI_APPLICATION); // Load the small icon for the application
 
 	if (!RegisterClassEx(&wc)) {

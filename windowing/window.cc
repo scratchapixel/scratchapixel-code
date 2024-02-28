@@ -178,7 +178,6 @@ int main(int argc, char** argv) {
 	MSG msg;
 	while (1) {
 		while(PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE) != 0) {
-			std::cerr << "buzzz" << std::endl;
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 			if (msg.message == WM_QUIT) {

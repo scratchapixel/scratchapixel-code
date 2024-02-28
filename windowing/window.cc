@@ -31,7 +31,7 @@ auto CreateBitmapFromRGB(char* pData, int width, int height)
     void* pBits;
     HBITMAP hbm = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, &pBits, nullptr, 0);
     if (hbm != nullptr) {
-        std::memcpy(pBits, pData, width * height * 3); // Assuming 3 bytes per pixel (RGB)
+        std::memcpy(pBits, pData, width * height * 3);
     }
     ReleaseDC(nullptr, hdc);
     return {hbm, pBits};
@@ -64,13 +64,13 @@ void InitializeOffScreenDC(HWND hwnd) {
 }
 
 void CleanupOffScreenDC() {
-    if (hdcOffscreen) DeleteDC(hdcOffscreen); // Delete the off-screen DC
+    if (hdcOffscreen) DeleteDC(hdcOffscreen);
 }
 
 void SetPixelColor(void* pBits, int width, int x, int y, uint8_t red, uint8_t green, uint8_t blue) {
-    if (!pBits) return; // Ensure we have a valid pointer.
+    if (!pBits) return;
 
-    int pixel_index = (y * width + x) * 3; // 3 bytes per pixel for RGB.
+    int pixel_index = (y * width + x) * 3;
     
     uint8_t* pPixel = static_cast<uint8_t*>(pBits) + pixel_index;
 
@@ -169,26 +169,10 @@ void CreateAndRegisterWindow(HINSTANCE hInstance) {
 }
 
 void DoSomeWork() {
-	//std::cerr << "Do stiff..." << std::endl;
+    /* not doing anything atm */
 }
 
 int main(int argc, char** argv) {
-	/*
-	std::unique_ptr<char []> buf(new char[win_width * win_height * 3]);
-	memset(buf.get(), 0x0, win_width * win_height * 3);
-	std::ifstream ifs("./aletta.pbm", std::ios::binary);
-	std::string string;
-	int width, height, bpp;
-	ifs >> string;
-	ifs >> width >> height >> bpp;
-	ifs.ignore();
-	ifs.read(buf.get(), win_width * win_height * 3);
-	for (uint32_t i = 0; i < win_width * win_height * 3; i += 3) {
-		std::swap(buf[i], buf[i + 2]);
-	}
-	ifs.close();
-	*/
-	//std::tie(hBitmap, pBits) = CreateBitmapFromRGB(buf.get(), win_width, win_height);
 	HINSTANCE hInstance = GetModuleHandle(NULL);
 	CreateAndRegisterWindow(hInstance);
 	MSG msg;

@@ -42,9 +42,9 @@ void InitializeOffScreenDC(HWND hwnd) {
 
 	memset(raw_data.get(), 0x0, win_width * win_height * 3);
 	std::ifstream ifs("./sample.pbm", std::ios::binary);
-	std::string string;
+	std::string header;
 	int width, height, bpp;
-	ifs >> string;
+	ifs >> header;
 	ifs >> width >> height >> bpp;
 	ifs.ignore();
 	ifs.read(raw_data.get(), win_width * win_height * 3);

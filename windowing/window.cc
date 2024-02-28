@@ -21,11 +21,11 @@ auto CreateBitmapFromRGB(char* pData, int width, int height)
 	-> std::pair<HBITMAP, void*> {
 	BITMAPINFO bmi = {0};
 	bmi.bmiHeader.biSize = sizeof(bmi.bmiHeader);
-    bmi.bmiHeader.biWidth = width;
-    bmi.bmiHeader.biHeight = -height; // Negative indicates top-down bitmap
-    bmi.bmiHeader.biPlanes = 1;
-    bmi.bmiHeader.biBitCount = 24; // Assuming 24-bit RGB
-    bmi.bmiHeader.biCompression = BI_RGB;
+	bmi.bmiHeader.biWidth = width;
+	bmi.bmiHeader.biHeight = -height; // Negative indicates top-down bitmap
+	bmi.bmiHeader.biPlanes = 1;
+	bmi.bmiHeader.biBitCount = 24; // Assuming 24-bit RGB
+	bmi.bmiHeader.biCompression = BI_RGB;
 
 	HDC hdc = GetDC(nullptr);
     void* pBits;

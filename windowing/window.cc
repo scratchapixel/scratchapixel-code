@@ -28,18 +28,18 @@ auto CreateBitmapFromRGB(char* pData, int width, int height)
 	bmi.bmiHeader.biCompression = BI_RGB;
 
 	HDC hdc = GetDC(nullptr);
-    void* pBits;
-    HBITMAP hbm = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, &pBits, nullptr, 0);
-    if (hbm != nullptr) {
-        std::memcpy(pBits, pData, width * height * 3);
-    }
-    ReleaseDC(nullptr, hdc);
-    return {hbm, pBits};
+	void* pBits;
+	HBITMAP hbm = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, &pBits, nullptr, 0);
+	if (hbm != nullptr) {
+		std::memcpy(pBits, pData, width * height * 3);
+	}
+	ReleaseDC(nullptr, hdc);
+	return {hbm, pBits};
 }
 
 void InitializeOffScreenDC(HWND hwnd) {
 	std::unique_ptr<char[]> raw_data(new char[win_width * win_height * 3]);
-	
+
 	memset(raw_data.get(), 0x0, win_width * win_height * 3);
 	std::ifstream ifs("./sample.pbm", std::ios::binary);
 	std::string string;
@@ -52,31 +52,31 @@ void InitializeOffScreenDC(HWND hwnd) {
 		std::swap(raw_data[i], raw_data[i + 2]);
 	}
 	ifs.close();
-    
-    auto bitmap_data = CreateBitmapFromRGB(raw_data.get(), win_width, win_height);
-    hBitmap = bitmap_data.first;
-    pBits = bitmap_data.second;
 
-    HDC hdc = GetDC(hwnd);
-    hdcOffscreen = CreateCompatibleDC(hdc);
-    SelectObject(hdcOffscreen, hBitmap);
-    ReleaseDC(hwnd, hdc);
+	auto bitmap_data = CreateBitmapFromRGB(raw_data.get(), win_width, win_height);
+	hBitmap = bitmap_data.first;
+	pBits = bitmap_data.second;
+
+	HDC hdc = GetDC(hwnd);
+	hdcOffscreen = CreateCompatibleDC(hdc);
+	SelectObject(hdcOffscreen, hBitmap);
+	ReleaseDC(hwnd, hdc);
 }
 
 void CleanupOffScreenDC() {
-    if (hdcOffscreen) DeleteDC(hdcOffscreen);
+	if (hdcOffscreen) DeleteDC(hdcOffscreen);
 }
 
 void SetPixelColor(void* pBits, int width, int x, int y, uint8_t red, uint8_t green, uint8_t blue) {
-    if (!pBits) return;
+	if (!pBits) return;
 
-    int pixel_index = (y * width + x) * 3;
-    
-    uint8_t* pPixel = static_cast<uint8_t*>(pBits) + pixel_index;
+	int pixel_index = (y * width + x) * 3;
 
-    pPixel[0] = blue;
-    pPixel[1] = green;
-    pPixel[2] = red;
+	uint8_t* pPixel = static_cast<uint8_t*>(pBits) + pixel_index;
+
+	pPixel[0] = blue;
+	pPixel[1] = green;
+	pPixel[2] = red;
 }
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {

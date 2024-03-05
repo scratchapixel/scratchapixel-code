@@ -110,12 +110,15 @@ void ProcessFace(const std::vector<std::string>& tuples,
 		face_vertices.push_back(face_vertex);
 	}
 }
+
 std::vector<Vec3f> vertices, normals;
 std::vector<Vec2f> tex_coordinates;
+
 struct FaceGroup {
 	std::vector<FaceVertex> face_vertices;
 	std::string name;
 };
+
 /**
  * Avoid using std::vector for storing elements when we need to maintain 
  * stable pointers or references to those elements across insertions or 
@@ -279,12 +282,12 @@ void DoSomeWork() {
 		fprintf(stderr, "\r%03u", static_cast<uint32_t>(j / static_cast<float>(image_height) * 100));
 	}
 	auto stop = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop - start);
-    std::cout << "Render time: " << duration.count() << " seconds." << std::endl;
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+    std::cout << "Render time: " << duration.count() / 1000.0 << " seconds." << std::endl;
 	std::ofstream ofs("./result.ppm", std::ios::binary);
 	ofs << "P6\n" << image_width << " " << image_height << "\n255\n";
 	for (uint32_t i = 0; i < image_width * image_height; ++i)
-		ofs << (unsigned char)buf[i] << (unsigned char)buf[i] << (unsigned char)buf[i];
+		ofs << buf[i] << buf[i] <<  buf[i];
 	ofs.close();
 }
 

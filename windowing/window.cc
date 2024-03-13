@@ -1,4 +1,7 @@
-//  clang++ -std=c++23 -luser32 -lgdi32 -o window.exe window.cc
+// (c) scratchapixel - 2024
+// Distributed under the terms of the CC BY-NC-ND 4.0 License.
+// https://creativecommons.org/licenses/by-nc-nd/4.0/
+// clang++ -Wall -Wextra -std=c++23 -luser32 -lgdi32 -o 3d-nav-controls.exe 3d-nav-controls.cc
 
 #define UNICODE
 #include <windows.h>
@@ -133,7 +136,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 }
 
 void CreateAndRegisterWindow(HINSTANCE hInstance) {
-	WNDCLASSEX wc = {0};
+	WNDCLASSEX wc = {};
 	wc.cbSize = sizeof(WNDCLASSEX);
 	wc.lpfnWndProc = WndProc;
 	wc.hInstance = hInstance;

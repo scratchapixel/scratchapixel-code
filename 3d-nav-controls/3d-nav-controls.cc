@@ -3,7 +3,6 @@
 // https://creativecommons.org/licenses/by-nc-nd/4.0/
 // clang++ -std=c++23 -Wall -Wextra -std=c++23 -luser32 -lgdi32 -o 3d-nav-controls.exe 3d-nav-controls.cc -O3
 
-
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <cstdint>
@@ -285,7 +284,7 @@ void OnMouseMoved(const gfx::Point& location) {
 		} break;
         case FreeCameraModel::CameraMoveType::DOLLY:
             OnMouseWheel(delta.x + delta.y);
-            break;
+            return;
         case FreeCameraModel::CameraMoveType::TRACK: {
 				Vec3<float> target_offset;
 				rotation_mat.MultDirMatrix(
@@ -443,6 +442,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 		case WM_MBUTTONUP:
 		case WM_RBUTTONUP:
 			OnMouseReleased();
+			InvalidateRect(hwnd, NULL, TRUE);
+			UpdateWindow(hwnd);
 			break;
 		case WM_LBUTTONDOWN:
 		case WM_MBUTTONDOWN:
@@ -481,6 +482,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 		case WM_ERASEBKGND:
 			return 1; // Indicate that background erase is handled
 		case WM_PAINT: {
+				const std::wstring mode[4] = { L"None", 
+											   L"Tumble (ALT+LMB)", 
+											   L"Track (Alt+MMB)", 
+											   L"Dolly (ALT+RMB/Wheel)"};
 				PAINTSTRUCT ps;
 				HDC hdcWindow = BeginPaint(hwnd, &ps);
 				BitBlt(hdcWindow, 0, 0, width, height, hdcBuffer, 0, 0, SRCCOPY);
@@ -488,6 +493,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 				SetTextColor(hdcWindow, RGB(255, 255, 255)); // White text
 				SetBkMode(hdcWindow, TRANSPARENT);
 				TextOut(hdcWindow, 10, 10, text.c_str(), text.length());
+				TextOut(hdcWindow, 10, 28, mode[(int)freecam_model.move_type].c_str(), 
+					mode[(int)freecam_model.move_type].length());
 			} break;
 		default:
 			return DefWindowProc(hWnd, msg, wParam, lParam);

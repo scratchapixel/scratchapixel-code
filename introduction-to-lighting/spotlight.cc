@@ -419,10 +419,6 @@ int main() {
 				pbuf[1] = static_cast<uint8_t>(std::min(1.f, L.y) * 255);
 				pbuf[2] = static_cast<uint8_t>(std::min(1.f, L.z) * 255);
 			}
-#ifdef VOLUME_RENDERING
-			float step_size = 0.1;
-
-#endif
 		}
 	}
 

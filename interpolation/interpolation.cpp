@@ -14,7 +14,6 @@
 #include <algorithm>
 #include <memory>
 #include <random>
-#include <iostream>
 
 template<typename T>
 class Color3 {
@@ -156,16 +155,17 @@ void TestBilinearInterpolation() {
  *
  * *or* if you have imagemagick you can make it into an animation like so:
  *
- * convert trilinear-slice-*.ppm demo.gif
+ * magick trilinear-slice-*.ppm demo.gif
  *
  */
 void TestTrilinearInterpolation() {
     //
     // Note that the size is gridSize ^ 3 and correspondingly, since we "upscale"
     // in each dimension, you will have (gridSize * scale) ^ 3 for the output 
-    // image. Computers are fast, but keeping these values under 30 is advisable.
+    // image. In this particular example, the initial 3D grid is 8x8x8 and the
+	// upres grid is 128x128x128. 
     //
-    uint32_t grid_size = 8;
+    uint32_t grid_size = 8; // number of cells along any of x, y and z-axis
     uint32_t scale = 16;
 
     uint32_t src_num_verts = grid_size + 1;

@@ -205,9 +205,6 @@ void TestTrilinearInterpolation() {
                 gxi0 = uint32_t(gx); tx = gx - gxi0;
                 gxi1 = std::min(grid_size, gxi0 + 1);
 
-                //std::cerr << "z: " << gzi0 << " " << gzi1 << ", y: " << gyi0 << ", " << gyi1 << ", x: " << gxi0 << " " << gxi1 << std::endl;
-                //std::cerr << tz << " " << ty << " " << tx << std::endl;
-
                 const Color3f& c000 = scr_grid3d[IX(src_num_verts, gxi0, gyi0, gzi0)];
                 const Color3f& c001 = scr_grid3d[IX(src_num_verts, gxi0, gyi0, gzi1)];
                 const Color3f& c010 = scr_grid3d[IX(src_num_verts, gxi0, gyi1, gzi0)];
@@ -218,11 +215,11 @@ void TestTrilinearInterpolation() {
                 const Color3f& c110 = scr_grid3d[IX(src_num_verts, gxi1, gyi1, gzi0)];
                 const Color3f& c111 = scr_grid3d[IX(src_num_verts, gxi1, gyi1, gzi1)];
 #if 1		
-                // interpolate latices in zy plane 
+                // interpolate lattices in zy plane 
                 Color3f e = bilinear(tz, ty, c000, c001, c010, c011);
                 Color3f f = bilinear(tz, ty, c100, c101, c110, c111);
 
-                // interpolate in x
+                // interpolate along the x-axis
                 Color3f g = e * (1 - tx) + f * tx;
 
                 target_grid3d[IX(target_num_verts, x, y, z)] = g;

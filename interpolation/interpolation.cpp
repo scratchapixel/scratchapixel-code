@@ -180,55 +180,88 @@ void testBilinearInterpolation()
     delete[] imageData;
 }
 
-#define IX(size, i, j, k) ( i * j * k * size + i * j * size + i )
+#define IX(size, i, j, k) ( (i) * size * size + (j) * size + k )
 
 // [comment]
-// Trilinear interpolation example. We place a color in the midle of the cells of a regular 3D grid.
+// Trilinear interpolation example. We take a cube of size "gridsize" and then "upscale" it to precision * gridsize
 // To evaluate the result of a random point within the grid, we pick the 8 point's neighbor cells and 
 // trilinearly interpolate the results.
+// Each of the results get written to a sequentially named ppm file.
+// They can be viewed, in an animation that cycles through the slices on the command line using a tool like "mpv" like so:
+//
+//  mpv --speed=10 --image-display-duration=0.1 trilinear-slice-*.ppm
+//
+// *or* if you have imagemagick you can make it into an animation like so: 
+//  
+//  convert trilinear-slice-*.ppm demo.gif
+//
 // [/comment]
 void testTrilinearInterpolation()
 {
+    //
+    // Note that the size is gridSize ^ 3 and correspondingly, since we "upscale" in each dimension, 
+    // you will have (gridSize * precision) ^ 3 for the output image. Computers are fast, but keeping 
+    // these values under 30 is advisable.
+    //
     int gridSize = 10;
+    int precision = 5;
+
     int numVertices = gridSize + 1;
+    int bsz = numVertices * precision;
     Color3f *grid3d = new Color3f[numVertices * numVertices * numVertices];
-    for (int k = 0; k < numVertices + 1; ++k) {
-        for (int j = 0; j < numVertices + 1; ++j) {
-            for (int i = 0; i < numVertices + 1; ++i) {
-                grid3d[IX(numVertices, i, j, k)] = Color3f(RANDFLOAT, RANDFLOAT, RANDFLOAT);
-            }
+    Color3f *imageData[numVertices * precision]; 
+
+    for (int i = 0; i < numVertices; ++i) {
+      for(int x = 0 ; x < precision; x++) {
+        imageData[i * precision + x] = new Color3f[numVertices * numVertices * precision * precision];
+      }
+      for (int j = 0; j < numVertices; ++j) {
+        for (int k = 0; k < numVertices; ++k) {
+          grid3d[IX(numVertices, i, j, k)] = Color3f(RANDFLOAT, RANDFLOAT, RANDFLOAT);
         }
+      }
     }
+
     // interpolate grid data, we assume the grid is a unit cube
-    float px, py, pz;
     float gx, gy, gz;
     int  gxi, gyi, gzi;
     float tx, ty, tz;
-    for (int i = 0; i < 10e2; ++i) {
-        px = RANDFLOAT;
-        py = RANDFLOAT;
-        pz = RANDFLOAT;
-        // remap point coordinates to grid coordinates
-        gx = px * gridSize; gxi = int(gx); tx = gx - gxi;
-        gy = py * gridSize; gyi = int(gy); ty = gy - gyi;
-        gz = pz * gridSize; gzi = int(gz); tz = gz - gzi;
-        const Color3f & c000 = grid3d[IX(numVertices, gxi, gyi, gzi)];
-        const Color3f & c100 = grid3d[IX(numVertices, gxi + 1, gyi, gzi)];
-        const Color3f & c010 = grid3d[IX(numVertices, gxi, gyi + 1, gzi)];
-        const Color3f & c110 = grid3d[IX(numVertices, gxi + 1, gyi + 1, gzi)];
-        const Color3f & c001 = grid3d[IX(numVertices, gxi, gyi, gzi + 1)];
-        const Color3f & c101 = grid3d[IX(numVertices, gxi + 1, gyi, gzi + 1)];
-        const Color3f & c011 = grid3d[IX(numVertices, gxi, gyi + 1, gzi + 1)];
-        const Color3f & c111 = grid3d[IX(numVertices, gxi + 1, gyi + 1, gzi + 1)];
 
-        // [comment]
-        // The two following blocks of code do the same thing. The second version is just
-        // an expansion of the first version (the first version is more "human readable").
-        // [/comment]
+    for (int x = 0; x < bsz; ++x) {
+      gx = float(x) / precision;
+      gxi = int(gx); tx = gx - gxi;
+
+      for (int y = 0; y < bsz; ++y) {
+        gy = float(y) / precision;
+        gyi = int(gy); ty = gy - gyi;
+
+        for (int z = 0; z < bsz; ++z) {
+          gz = float(z) / precision;
+          gzi = int(gz); tz = gz - gzi;
+
+          const Color3f & c000 = grid3d[IX(numVertices, gxi, gyi, gzi)];
+          const Color3f & c001 = grid3d[IX(numVertices, gxi, gyi, gzi + 1)];
+          const Color3f & c010 = grid3d[IX(numVertices, gxi, gyi + 1, gzi)];
+          const Color3f & c011 = grid3d[IX(numVertices, gxi, gyi + 1, gzi + 1)];
+
+          const Color3f & c100 = grid3d[IX(numVertices, gxi + 1, gyi, gzi)];
+          const Color3f & c101 = grid3d[IX(numVertices, gxi + 1, gyi, gzi + 1)];
+          const Color3f & c110 = grid3d[IX(numVertices, gxi + 1, gyi + 1, gzi)];
+          const Color3f & c111 = grid3d[IX(numVertices, gxi + 1, gyi + 1, gzi + 1)];
+
+          // [comment]
+          // The two following blocks of code do the same thing. The second version is just
+          // an expansion of the first version (the first version is more "human readable").
+          // [/comment]
 #if 1		
-        Color3f e = bilinear(tx, ty, c000, c100, c010, c110);
-        Color3f f = bilinear(tx, ty, c001, c101, c011, c111);
-        Color3f g = e * (1 - tz) + f * tz;
+          // It's one surface than the other 
+          Color3f e = bilinear(tz, ty, c000, c001, c010, c011);
+          Color3f f = bilinear(tz, ty, c100, c101, c110, c111);
+
+          // And then the percentage between them
+          Color3f g = e * (1 - tx) + f * tx;
+
+          imageData[x][bsz * y + z] = g;
 #else
         Color3f g =
             (1 - tx)*(1 - ty)*(1 - tz)*c000 +
@@ -240,8 +273,17 @@ void testTrilinearInterpolation()
             (1 - tx)*ty*tz*c011 +
             tx*ty*tz*c111;
 #endif
+        }
+      }
     }
     delete[] grid3d;
+
+    char fName[100] = {0};
+    for (int k = 0; k < gridSize * precision; ++k) {
+      sprintf(fName, "trilinear-slice-%04d.ppm", k);
+      saveToPPM(fName, imageData[k], bsz, bsz);
+      delete imageData[k];
+    }
 }
 
 int main(int argc, char **argv)

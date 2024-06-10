@@ -1,33 +1,10 @@
-//[header]
-// This program demonstrates linear, bilinear and trilinear interpolation
-//[/header]
-//[compile]
-// Download the interpolation.cpp file to a folder.
-// Open a shell/terminal, and run the following command where the files is saved:
-//
+// (c) www.scratchapixel.com - 2024.
+// Distributed under the terms of the CC BY-NC-ND 4.0 License.
+// https://creativecommons.org/licenses/by-nc-nd/4.0/
+// Contributors:
+// - Scratchpixel
+// - Kristopolous / Chris Mckenzie
 // clang++ -std=c++11 -o interpolation interpolation.cpp -O3
-//
-// You can use c++ if you don't use clang++
-//
-// Run with: ./interpolation. Open the resulting image (ppm) in Photoshop or any program
-// reading PPM files.
-//[/compile]
-//[ignore]
-// Copyright (C) 2016  www.scratchapixel.com
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//[/ignore]
 
 #ifdef WIN32
 #include "stdafx.h"
@@ -39,26 +16,21 @@
 #include <algorithm>
 
 template<typename T>
-class Color3
-{
+class Color3 {
 public:
     Color3() : r(0), g(0), b(0) {}
     Color3(T rr) : r(rr), g(rr), b(rr) {}
     Color3(T rr, T gg, T bb) : r(rr), g(gg), b(bb) {}
-    Color3 operator * (const T &v) const
-    {
+    Color3 operator * (const T &v) const {
         return Color3(r*v, g*v, b*v);
     }
-    Color3 operator + (const Color3 &c) const
-    {
+    Color3 operator + (const Color3 &c) const {
         return Color3(r + c.r, g + c.g, b + c.b);
     }
-    friend Color3 operator * (const float &f, const Color3 &c)
-    {
+    friend Color3 operator * (const float &f, const Color3 &c) {
         return Color3(c.r * f, c.g * f, c.b * f);
     }
-    friend std::ostream & operator << (std::ostream &os, const Color3 &c)
-    {
+    friend std::ostream & operator << (std::ostream &os, const Color3 &c) {
         os << c.r << " " << c.g << " " << c.b;
         return os;
     }
@@ -67,8 +39,7 @@ public:
 
 typedef Color3<float> Color3f;
 
-void saveToPPM(const char *fn, const Color3f *c, const int &width, const int &height)
-{
+void saveToPPM(const char *fn, const Color3f *c, const int &width, const int &height) {
     std::ofstream ofs;
     // flags are necessary if your compile on Windows
     ofs.open(fn, std::ios::out | std::ios::binary);
@@ -91,9 +62,6 @@ void saveToPPM(const char *fn, const Color3f *c, const int &width, const int &he
     ofs.close();
 }
 
-// [comment]
-// Linear interpolation
-// [/comment]
 template<typename T>
 T bilinear(
     const float &tx,
@@ -101,8 +69,7 @@ T bilinear(
     const T &c00,
     const T &c10,
     const T &c01,
-    const T &c11)
-{
+    const T &c11) {
 #if 1
     T a = c00 * (1.f - tx) + c10 * tx;
     T b = c01 * (1.f - tx) + c11 * tx;
@@ -121,13 +88,7 @@ T bilinear(
     #define RANDFLOAT drand48()
 #endif
 
-// [comment]
-// Bilinear interpolation example. We place a color in the midle of the cells of a regular 2D grid.
-// To evaluate the result of a random point (pixel) within the grid, we pick the 4 point's neighbor cells and 
-// bilinearly interpolate the results.
-// [/comment]
-void testBilinearInterpolation()
-{
+void testBilinearInterpolation() {
     // testing bilinear interpolation
     int imageWidth = 512;
     int gridSizeX = 9, gridSizeY = 9;
@@ -182,77 +143,72 @@ void testBilinearInterpolation()
 
 #define IX(size, i, j, k) ( (i) * size * size + (j) * size + k )
 
-// [comment]
-// Trilinear interpolation example. We take a cube of size "gridsize" and then "upscale" it to precision * gridsize
-// To evaluate the result of a random point within the grid, we pick the 8 point's neighbor cells and 
-// trilinearly interpolate the results.
-// Each of the results get written to a sequentially named ppm file.
-// They can be viewed, in an animation that cycles through the slices on the command line using a tool like "mpv" like so:
-//
-//  mpv --speed=10 --image-display-duration=0.1 trilinear-slice-*.ppm
-//
-// *or* if you have imagemagick you can make it into an animation like so: 
-//  
-//  convert trilinear-slice-*.ppm demo.gif
-//
-// [/comment]
-void testTrilinearInterpolation()
-{
+/**
+ * Trilinear interpolation example. We take a cube of size "gridsize" and then 
+ * "upscale" it to scale * gridsize. To evaluate the result of a random 
+ * point within the grid, we pick the 8 point's neighbor cells and trilinearly 
+ * interpolate the results. Each of the results get written to a sequentially 
+ * named ppm file. They can be viewed, in an animation that cycles through the 
+ * slices on the command line using a tool like "mpv" like so:
+ *
+ * mpv --speed=10 --image-display-duration=0.1 trilinear-slice-*.ppm
+ *
+ * *or* if you have imagemagick you can make it into an animation like so: 
+ *
+ * convert trilinear-slice-*.ppm demo.gif
+ *
+ */
+void testTrilinearuint32_terpolation() {
     //
-    // Note that the size is gridSize ^ 3 and correspondingly, since we "upscale" in each dimension, 
-    // you will have (gridSize * precision) ^ 3 for the output image. Computers are fast, but keeping 
-    // these values under 30 is advisable.
+    // Note that the size is gridSize ^ 3 and correspondingly, since we "upscale"
+	// in each dimension, you will have (gridSize * scale) ^ 3 for the output 
+	// image. Computers are fast, but keeping these values under 30 is advisable.
     //
-    int gridSize = 10;
-    int precision = 5;
+    uint32_t gridSize = 10;
+    uint32_t scale = 5;
 
-    int numVertices = gridSize + 1;
-    int bsz = numVertices * precision;
-    Color3f *grid3d = new Color3f[numVertices * numVertices * numVertices];
-    Color3f *imageData[numVertices * precision]; 
+    uint32_t src_num_verts = gridSize + 1;
+    uint32_t target_num_verts = src_num_verts * scale;
+    Color3f *grid3d = new Color3f[src_num_verts * src_num_verts * src_num_verts];
+    Color3f *imageData[src_num_verts * scale]; 
 
-    for (int i = 0; i < numVertices; ++i) {
-      for(int x = 0 ; x < precision; x++) {
-        imageData[i * precision + x] = new Color3f[numVertices * numVertices * precision * precision];
+    for (uint32_t i = 0; i < src_num_verts; ++i) {
+      for(uint32_t x = 0 ; x < scale; x++) {
+        imageData[i * scale + x] = new Color3f[src_num_verts * src_num_verts * scale * scale];
       }
-      for (int j = 0; j < numVertices; ++j) {
-        for (int k = 0; k < numVertices; ++k) {
-          grid3d[IX(numVertices, i, j, k)] = Color3f(RANDFLOAT, RANDFLOAT, RANDFLOAT);
+      for (uint32_t j = 0; j < src_num_verts; ++j) {
+        for (uint32_t k = 0; k < src_num_verts; ++k) {
+          grid3d[IX(src_num_verts, i, j, k)] = Color3f(RANDFLOAT, RANDFLOAT, RANDFLOAT);
         }
       }
     }
 
-    // interpolate grid data, we assume the grid is a unit cube
+    // uint32_terpolate grid data, we assume the grid is a unit cube
     float gx, gy, gz;
-    int  gxi, gyi, gzi;
+    uint32_t  gxi, gyi, gzi;
     float tx, ty, tz;
 
-    for (int x = 0; x < bsz; ++x) {
-      gx = float(x) / precision;
-      gxi = int(gx); tx = gx - gxi;
+    for (uint32_t x = 0; x < target_num_verts; ++x) {
+      gx = float(x) / scale;
+      gxi = uint32_t(gx); tx = gx - gxi;
 
-      for (int y = 0; y < bsz; ++y) {
-        gy = float(y) / precision;
-        gyi = int(gy); ty = gy - gyi;
+      for (uint32_t y = 0; y < target_num_verts; ++y) {
+        gy = float(y) / scale;
+        gyi = uint32_t(gy); ty = gy - gyi;
 
-        for (int z = 0; z < bsz; ++z) {
-          gz = float(z) / precision;
-          gzi = int(gz); tz = gz - gzi;
+        for (uint32_t z = 0; z < target_num_verts; ++z) {
+          gz = float(z) / scale;
+          gzi = uint32_t(gz); tz = gz - gzi;
 
-          const Color3f & c000 = grid3d[IX(numVertices, gxi, gyi, gzi)];
-          const Color3f & c001 = grid3d[IX(numVertices, gxi, gyi, gzi + 1)];
-          const Color3f & c010 = grid3d[IX(numVertices, gxi, gyi + 1, gzi)];
-          const Color3f & c011 = grid3d[IX(numVertices, gxi, gyi + 1, gzi + 1)];
+          const Color3f & c000 = grid3d[IX(src_num_verts, gxi, gyi, gzi)];
+          const Color3f & c001 = grid3d[IX(src_num_verts, gxi, gyi, gzi + 1)];
+          const Color3f & c010 = grid3d[IX(src_num_verts, gxi, gyi + 1, gzi)];
+          const Color3f & c011 = grid3d[IX(src_num_verts, gxi, gyi + 1, gzi + 1)];
 
-          const Color3f & c100 = grid3d[IX(numVertices, gxi + 1, gyi, gzi)];
-          const Color3f & c101 = grid3d[IX(numVertices, gxi + 1, gyi, gzi + 1)];
-          const Color3f & c110 = grid3d[IX(numVertices, gxi + 1, gyi + 1, gzi)];
-          const Color3f & c111 = grid3d[IX(numVertices, gxi + 1, gyi + 1, gzi + 1)];
-
-          // [comment]
-          // The two following blocks of code do the same thing. The second version is just
-          // an expansion of the first version (the first version is more "human readable").
-          // [/comment]
+          const Color3f & c100 = grid3d[IX(src_num_verts, gxi + 1, gyi, gzi)];
+          const Color3f & c101 = grid3d[IX(src_num_verts, gxi + 1, gyi, gzi + 1)];
+          const Color3f & c110 = grid3d[IX(src_num_verts, gxi + 1, gyi + 1, gzi)];
+          const Color3f & c111 = grid3d[IX(src_num_verts, gxi + 1, gyi + 1, gzi + 1)];
 #if 1		
           // It's one surface than the other 
           Color3f e = bilinear(tz, ty, c000, c001, c010, c011);
@@ -279,8 +235,8 @@ void testTrilinearInterpolation()
     delete[] grid3d;
 
     char fName[100] = {0};
-    for (int k = 0; k < gridSize * precision; ++k) {
-      sprintf(fName, "trilinear-slice-%04d.ppm", k);
+    for (uint32_t k = 0; k < gridSize * scale; ++k) {
+      spruint32_tf(fName, "trilinear-slice-%04d.ppm", k);
       saveToPPM(fName, imageData[k], bsz, bsz);
       delete imageData[k];
     }

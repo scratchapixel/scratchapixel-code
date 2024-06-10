@@ -4,7 +4,7 @@
 // Contributors:
 // - Scratchpixel
 // - Kristopolous / Chris Mckenzie
-// clang++ -std=c++11 -o interpolation interpolation.cpp -O3
+// clang++ -std=c++23 -O3 -o interpolation.exe interpolation.cpp
 
 #define _CRT_SECURE_NO_WARNINGS
 
@@ -215,7 +215,7 @@ void TestTrilinearInterpolation() {
                 const Color3f& c110 = scr_grid3d[IX(src_num_verts, gxi1, gyi1, gzi0)];
                 const Color3f& c111 = scr_grid3d[IX(src_num_verts, gxi1, gyi1, gzi1)];
 #if 1		
-                // interpolate lattices in zy plane 
+                // interpolate vertex data in zy plane at x and x+1 
                 Color3f e = bilinear(tz, ty, c000, c001, c010, c011);
                 Color3f f = bilinear(tz, ty, c100, c101, c110, c111);
 

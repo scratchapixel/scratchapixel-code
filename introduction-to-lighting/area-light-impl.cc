@@ -205,7 +205,8 @@ public:
 };
 
 class AreaLight : public Light {
-public:	
+public:
+	virtual Vec3f Le() const = 0;
 };
 
 class TriangleLight : public AreaLight {
@@ -238,6 +239,10 @@ public:
 		if (d_dot_Ng >= 0) return 0;
 		wi = Sample3f(d / tmax, (2.f * tmax * tmax * tmax) / std::abs(d_dot_Ng));
 		return Le_;
+	}
+	
+	Vec3f Le() const override { 
+		return Le_; 
 	}
 
 	Vec3f v0_;
@@ -410,7 +415,7 @@ public:
 		Vec3f L = 0;
 
 		if (dg.light)
-			L += Vec3f(1);
+			L += dg.light->Le();
 
 		size_t num_samples = 2048;
 		for (size_t i = 0; i < scene->lights_.size(); ++i) {
@@ -502,14 +507,21 @@ void MakeScene() {
 	box->triangles_.push_back({3, 6, 4});
 	prims.push_back(std::make_unique<Primitive>(box, material, m));
 
-	std::shared_ptr<TriangleLight> light = std::make_shared<TriangleLight>(
+	std::shared_ptr<TriangleLight> light0 = std::make_shared<TriangleLight>(
 		Vec3f(-1, -1, 0), 
 		Vec3f( 1, -1, 0), 
-		Vec3f( 0,  1, 0), 
+		Vec3f( -1, 1, 0), 
+		Vec3f(5.f));
+	
+	std::shared_ptr<TriangleLight> light1 = std::make_shared<TriangleLight>(
+		Vec3f( 1, -1, 0), 
+		Vec3f( 1,  1, 0), 
+		Vec3f( -1, 1, 0), 
 		Vec3f(5.f));
 
 	Matrix44<float> xfm_light(0, 0, -1, 0, 0, 1, 0, 0, 1, 0, 0, 0, -1, 0, -4, 1);
-	prims.push_back(std::make_unique<Primitive>(light, xfm_light));
+	prims.push_back(std::make_unique<Primitive>(light0, xfm_light));
+	prims.push_back(std::make_unique<Primitive>(light1, xfm_light));
 
 	// once we have all prims we need to process them
 	size_t num_allocated_triangles = 0;

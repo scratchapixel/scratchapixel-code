@@ -29,8 +29,8 @@ using Vec2f = Vec2<float>;
 
 constexpr uint32_t nsamples = 512;
 
-Vec2f NaiveMethod(const Vec2f& v1, const Vec2f& v2, float u, float v) {
-	return u * v1 + (1.f - u) * v * v2;
+Vec2f NaiveMethod(const Vec2f& v1, const Vec2f& v2, float r1, float r2) {
+	return /* (1 - r1) * v0 + */ r1 * (1 - r2) * v1 + r1 * r2 * v2;
 }
 
 Vec2f BarycentricCoordinatesMethodBad(const Vec2f& v1, const Vec2f& v2, float u, float v, float w) {
@@ -55,6 +55,26 @@ Vec2f KraemerMethod(const Vec2f& v1, const Vec2f& v2, float r1, float r2) {
     return /* u * v0 + */ v * v1 + w * v2;
 }
 
+Vec2f RejectionMethod(const Vec2f& v1, const Vec2f& v2, float r1, float r2) {
+	if (r1 + r2 > 1) {
+		r1 = 1 - r1;
+		r2 = 1 - r2;
+	}
+	return /* (1 - r1 - r2) * v0 + */ r1 * v1 + r2 * v2;
+}
+
+// maps a unit - square point (x, y) to a unit - triangle point
+Vec2f LowDistortionMethod(const Vec2f& v1, const Vec2f& v2, float r1, float r2) {
+	if (r2 > r1) {
+		r1 *= 0.5f;
+		r2 -= r1;
+	} else {
+		r2 *= 0.5f ;
+		r1 -= r2;
+	}
+	return /* (1 - r1 - r2) * v0 + */ r1 * v1 + r2 * v2;
+}
+
 template<typename  SamplingMethod>
 void SampleTriangle(SamplingMethod sample) {
 	std::random_device rd;
@@ -68,5 +88,5 @@ void SampleTriangle(SamplingMethod sample) {
 }
 
 int main() {
-	SampleTriangle(BarycentricCoordinatesMethodGood);
+	SampleTriangle(RejectionMethod);
 };

@@ -11,6 +11,8 @@
 #include <cmath>
 #include <fstream>
 #include <algorithm>
+#include <cassert>
+#include <chrono>
 #include "math.h"
 
 using Vec2f = Vec2<float>;
@@ -67,7 +69,7 @@ struct DifferentialGeometry : public Hit { // renderer/shapes/differentialgeomet
 	float error;
 };
 
-class Shape {
+class Shape : public std::enable_shared_from_this<Shape> {
 public:
 	virtual ~Shape() = default;
 	virtual size_t GetNumVertices() const = 0;
@@ -120,7 +122,10 @@ public:
 	Vec3f Ng_;
 };
 
-class TriangleMesh : public Shape, public std::enable_shared_from_this<TriangleMesh> {
+template<>
+const Matrix44<float> Matrix44<float>::kIdentity = Matrix44<float>();
+
+class TriangleMesh : public Shape {
 public:	
 	struct Triangle {
 		uint32_t v0;
@@ -146,8 +151,21 @@ public:
 		}
 		return bounds;
 	}
-	std::shared_ptr<Shape> Transform(const Matrix44f& m) const override {
-		return const_cast<TriangleMesh*>(this)->shared_from_this();
+	std::shared_ptr<Shape> Transform([[maybe_unused]] const Matrix44f& m) const override {
+		if (m == Matrix44f::kIdentity)
+			return const_cast<TriangleMesh*>(this)->shared_from_this();
+
+		std::shared_ptr<TriangleMesh> mesh = std::make_shared<TriangleMesh>();
+
+		mesh->vertices_.resize(vertices_.size());
+		for (size_t i = 0; i < vertices_.size(); ++i) m.MultVecMatrix(vertices_[i], mesh->vertices_[i]); 
+
+		mesh->normals_.resize(normals_.size());
+		Matrix44f m_inverse = m.Transposed();
+		for (size_t i = 0; i < normals_.size(); ++i) m_inverse.MultDirMatrix(normals_[i], mesh->normals_[i]); 
+		mesh->triangles_ = triangles_;
+
+		return mesh;
 	}
 
 	void PostIntersect(const Ray& ray, DifferentialGeometry& dg) const override {
@@ -156,7 +174,7 @@ public:
 		const Vec3f& v1 = vertices_[tri.v1];
 		const Vec3f& v2 = vertices_[tri.v2];
 
-		const float u = dg.u, v = dg.v, w = 1 - u - v, t = dg.t;
+		[[maybe_unused]] const float u = dg.u, v = dg.v, w = 1 - u - v, t = dg.t;
 
 		const Vec3f dPdu = v1 - v0;
 		const Vec3f dPdv = v2 - v0;
@@ -169,7 +187,48 @@ public:
 	std::vector<Triangle> triangles_;
 };
 
-// sample.h
+class Sphere : public TriangleMesh {
+public:
+	Sphere(Vec3f center, float radius) : center_(center), radius_(radius) {
+		Triangulate();
+	}
+private:
+	Vec3f Eval(float theta, float phi) const {
+		return Vec3f(std::cos(phi) * std::sin(theta), std::cos(theta), std::sin(phi) * std::sin(theta));
+	}
+	void Triangulate() {
+		float rcp_num_theta = 1.f / num_theta_;
+		float rcp_num_phi = 1.f / num_phi_;
+
+		for (uint32_t theta = 0; theta <= num_theta_; theta++) {
+			for (uint32_t phi = 0; phi < num_phi_; phi++) {
+			  
+				Vec3f p = Eval(theta * M_PI * rcp_num_theta, phi * 2.0f * M_PI * rcp_num_phi);
+				Vec3f dpdu = Eval((theta + 0.001f) * M_PI * rcp_num_theta, phi * 2.0f * M_PI * rcp_num_phi) - center_;
+				Vec3f dpdv = Eval(theta * M_PI * rcp_num_theta,(phi + 0.001f) * 2.0f * M_PI * rcp_num_phi) - center_;
+				p = center_ + radius_ * p;
+
+				vertices_.push_back(p);
+				normals_.push_back(dpdv.Cross(dpdu).Normalize());
+			}
+			if (theta == 0) continue;
+			for (uint32_t phi = 1; phi <= num_phi_; phi++) {
+				uint32_t p00 = (theta -1) * num_phi_ + phi - 1;
+				uint32_t p01 = (theta -1) * num_phi_ + phi % num_phi_;
+				uint32_t p10 = theta * num_phi_ + phi - 1;
+				uint32_t p11 = theta * num_phi_ + phi % num_phi_;
+				if (theta > 1) triangles_.push_back({p10, p01, p00});
+				if (theta < num_theta_) triangles_.push_back({p11, p01, p10});
+			}
+		}
+	}
+	
+	Vec3f center_{0};
+	float radius_{1};
+	uint32_t num_theta_{10};
+	uint32_t num_phi_{10};
+};
+
 template<typename T> 
 struct Sample {
 	Sample() {}
@@ -184,16 +243,22 @@ struct Sample {
 
 using Sample3f = Sample<Vec3f>;
 
-// sampler.h
 struct LightSample {
 	Sample3f wi;
 	float tmax;
 	Vec3f L;
 };
 
-Vec3f UniformSampleTriangle(const float& u, const float& v, const Vec3f& A, const Vec3f& B, const Vec3f& C) {
+inline Vec3f UniformSampleTriangle(const float& u, const float& v, const Vec3f& A, const Vec3f& B, const Vec3f& C) {
 	float su = std::sqrt(u);
 	return Vec3f(C + (1.f - su) * (A - C) + (v * su) * (B - C));
+}
+
+inline Vec3f UniformSampleSphere(const float& r1, const float& r2) {
+	float z = 1.f - 2.f * r1; // cos(theta)
+	float sin_theta = std::sqrt(1 - z * z);
+	float phi = 2 * M_PI * r2; // azimuthal angle
+	return {std::cos(phi) * sin_theta, std::sin(phi) * sin_theta, z};
 }
 
 class Light {
@@ -204,21 +269,26 @@ public:
 	virtual Vec3f Sample(const DifferentialGeometry& dg, Sample3f& wi, float &tmax, const Vec2f& sample) const = 0;
 };
 
-class AreaLight : public Light {
+class AreaLight : public Light, std::enable_shared_from_this<Shape> {
 public:
-	virtual Vec3f Le() const = 0;
+	AreaLight(const Vec3f& Le) : Le_(Le) {
+	}
+	virtual Vec3f Le() const { return Le_; }
+
+protected:
+	Vec3f Le_;
 };
 
 class TriangleLight : public AreaLight {
 public:
 	TriangleLight(const Vec3f& v0, const Vec3f& v1, const Vec3f& v2, const Vec3f& Le)
-		: v0_(v0)
+		: AreaLight(Le)
+		, v0_(v0)
 		, v1_(v1)
 		, v2_(v2)
 		, e1_(v1 - v0)
 		, e2_(v2 - v0)
 		, Ng_(e1_.Cross(e2_))
-		, Le_(Le)
 		, tri_(new Triangle(v0, v1, v2)) {
 	}
 
@@ -240,10 +310,6 @@ public:
 		wi = Sample3f(d / tmax, (2.f * tmax * tmax * tmax) / std::abs(d_dot_Ng));
 		return Le_;
 	}
-	
-	Vec3f Le() const override { 
-		return Le_; 
-	}
 
 	Vec3f v0_;
 	Vec3f v1_;
@@ -253,8 +319,167 @@ private:
 	Vec3f e1_;
 	Vec3f e2_;
 	Vec3f Ng_;
-	Vec3f Le_;
 	std::shared_ptr<Triangle> tri_;
+};
+
+inline void CoordinateSystem(const Vec3f& n, Vec3f& b1, Vec3f& b2) {
+#if 0
+	if (std::fabs(v1.x) > std::fabs(v1.y)) {
+        float inv_len = 1 / std::sqrt(v1.x * v1.x + v1.z * v1.z);
+        v2 = Vec3f(v1.z * inv_len, 0, -v1.x * inv_len);
+    }
+    else {
+        float inv_len = 1 / std::sqrt(v1.y * v1.y + v1.z * v1.z);
+        v2 = Vec3f(0, -v1.z * inv_len, v1.y * inv_len); 
+    }
+    v3 = v1.Cross(v2);
+#else
+	float sign = std::copysign(1.0f, n.z);
+	const float a = -1.0f / (sign + n.z);
+	const float b = n.x * n.y * a;
+	b1 = Vec3f(1.0f + sign * n.x * n.x * a, sign * b, -sign * n.x);
+	b2 = Vec3f(b, sign + n.y * n.y * a, -n.y);
+#endif
+}
+
+inline Vec3f UniformSampleCone(float r1, float r2, float cos_theta_max, const Vec3f& x, const Vec3f& y, const Vec3f& z) {
+	float cos_theta = (1.f - r1) + r1 * cos_theta_max;//std::lerp(cos_theta_max, 1.f, r1);
+	float sin_theta = std::sqrt(1.f - cos_theta * cos_theta);
+	float phi = 2 * M_PI * r2;
+	return std::cos(phi) * sin_theta * x + std::sin(phi) * sin_theta * y + cos_theta * z;
+}
+
+inline bool Quadratic(float A, float B, float C, float &t0, float &t1) {
+    float discrim = B * B - 4 * A * C;
+    if (discrim < 0) return false;
+    float root_discrim = std::sqrt(discrim);
+
+    float q;
+    if (B < 0) 
+		q = -.5f * (B - root_discrim);
+    else 
+		q = -.5f * (B + root_discrim);
+    t0 = q / A;
+    t1 = C / q;
+    if (t0 > t1) std::swap(t0, t1);
+    return true;
+}
+
+class SphereLight : public AreaLight {
+public:
+	SphereLight(Vec3f center = 0, float radius = 1, const Vec3f& Le = 1)
+		: AreaLight(Le)
+		, center_(center)
+		, radius_(radius)
+		, sphere_(new Sphere(center, radius)) {
+	}
+
+	std::shared_ptr<Light> Transform(const Matrix44f& xfm) const override {
+		Vec3f center_world_pos;
+		Vec3f scale;
+		ExtractScaling(xfm, scale);
+		assert(scale.x == scale.y && scale.x == scale.z);
+		xfm.MultVecMatrix(center_, center_world_pos);
+		return std::make_shared<SphereLight>(center_world_pos, radius_ * scale.x, Le_);
+	}
+
+	std::shared_ptr<Shape> GetShape() override { return sphere_; }
+
+	Vec3f Sample(const DifferentialGeometry& dg, Sample3f& wi, float &tmax, const Vec2f& sample) const override {
+#ifdef AREA_SAMPLING
+		Vec3f n = UniformSampleSphere(sample.x, sample.y);
+		Vec3f p = center_ + n * radius_;
+		Vec3f d = p - dg.P;
+		tmax = d.Length();
+#elif defined(INTERSECT_METHOD)
+		Vec3f dz = center_ - dg.P;
+		float dz_len_2 = dz.Dot(dz);
+		float dz_len = std::sqrtf(dz_len_2);
+		dz /= dz_len;
+		Vec3f dx, dy;
+
+		CoordinateSystem(dz, dy, dx);
+
+		// skip check for x inside the sphere
+		float sin_theta_max_2 = radius_ * radius_ / dz_len_2;
+		float cos_theta_max = std::sqrt(std::max(0.f, 1.f - sin_theta_max_2));
+		Vec3f sample_dir = UniformSampleCone(sample.x, sample.y, cos_theta_max, dx, dy, dz);
+
+		if (!Intersect(dg.P, sample_dir, tmax)) {
+			tmax = (center_ - dg.P).Dot(sample_dir);
+		}	
+		Vec3f p = dg.P + sample_dir * tmax;
+		Vec3f d = p - dg.P;
+		Vec3f n = (p - center_).Normalize();
+#else
+		Vec3f dz = center_ - dg.P;
+		float dz_len_2 = dz.Dot(dz);
+		float dz_len = std::sqrtf(dz_len_2);
+		dz /= -dz_len;
+		Vec3f dx, dy;
+
+		CoordinateSystem(dz, dx, dy);
+
+		float sin_theta_max_2 = radius_ * radius_ / dz_len_2;
+		float sin_theta_max = std::sqrt(sin_theta_max_2);
+		float cos_theta_max = std::sqrt(std::max(0.f, 1.f - sin_theta_max_2));
+
+		float cos_theta = 1 + (cos_theta_max - 1) * sample.x;
+		float sin_theta_2 = 1.f - cos_theta * cos_theta;
+
+		float cos_alpha = sin_theta_2 / sin_theta_max + cos_theta * std::sqrt(1 - sin_theta_2 / (sin_theta_max * sin_theta_max));
+		float sin_alpha = std::sqrt(1 - cos_alpha * cos_alpha);
+		float phi = 2 * M_PI * sample.y;
+
+		Vec3f n = std::cos(phi) * sin_alpha * dx + std::sin(phi) * sin_alpha * dy + cos_alpha * dz;
+		Vec3f p = center_ + n * radius_;
+
+		Vec3f d = p - dg.P;
+		tmax = d.Length();
+#endif
+
+		float d_dot_n = d.Dot(n);
+		if (d_dot_n >= 0) return 0;
+
+#if AREA_SAMPLING
+		wi = Sample3f(d / tmax, (2.f * tmax * tmax * tmax) / std::abs(d_dot_n));
+#else
+		float pdf = 1.f / (2.f * M_PI * (1.f - cos_theta_max));
+		wi = Sample3f(d / tmax, pdf);
+#endif
+		//abort();
+		return Le_;
+	}
+
+private:
+	bool Intersect(const Vec3f& orig, const Vec3f& dir, float &thit) const {
+#if 0
+		Vec3f l = center_ - orig;
+		float tca = l.Dot(dir);
+		if (tca < 0) { std::cerr << "nopppee\n"; return false; }
+		float d2 = l.Dot(l) - tca * tca;
+		if (d2 > radius_ * radius_) return false;
+		float thc = std::sqrt(radius_ * radius_ - d2);
+		float t0 = tca - thc;
+		float t1 = tca + thc;
+		thit = t0;
+#else
+		Vec3f o = orig - center_;
+		Vec3f d = dir;
+		float a = d.Dot(d);
+		float b = 2 * o.Dot(d);
+		float c = o.Dot(o) - radius_ * radius_;
+		float t0, t1;
+		if (!Quadratic(a, b, c, t0, t1)) return false;
+		thit = t0;
+#endif
+		return true;
+	}
+
+
+	Vec3f center_{0};
+	float radius_{1};
+	std::shared_ptr<Sphere> sphere_;
 };
 
 class Material {
@@ -313,7 +538,6 @@ public:
 	std::vector<std::unique_ptr<Instance>> geometry_;
 	std::vector<std::shared_ptr<Light>> lights_;
 
-	// will go away when we implement the bvh
 	std::unique_ptr<BuildTriangle[]> triangles_;
 	std::unique_ptr<Vec3f[]> vertices_;
 	size_t num_triangles_;
@@ -417,7 +641,7 @@ public:
 		if (dg.light)
 			L += dg.light->Le();
 
-		size_t num_samples = 2048;
+		size_t num_samples = 512;
 		for (size_t i = 0; i < scene->lights_.size(); ++i) {
 			Vec3f L_light = 0;
 			for (size_t n = 0; n < num_samples; ++n) {
@@ -443,8 +667,6 @@ public:
 };
 
 
-// todo: what happens to prims once we don't need them anymore (since they are declared as globals?)?
-// todo: please review all shared and unique_ptrs... Look at scene differences betwen geoms and lights
 std::vector<std::unique_ptr<Primitive>> prims;
 
 void CalculateSize(const std::unique_ptr<Primitive>& prim, size_t& num_triangles, size_t& num_vertices) {
@@ -519,9 +741,17 @@ void MakeScene() {
 		Vec3f( -1, 1, 0), 
 		Vec3f(5.f));
 
-	Matrix44<float> xfm_light(0, 0, -1, 0, 0, 1, 0, 0, 1, 0, 0, 0, -1, 0, -4, 1);
-	prims.push_back(std::make_unique<Primitive>(light0, xfm_light));
-	prims.push_back(std::make_unique<Primitive>(light1, xfm_light));
+	//Matrix44<float> xfm_light(0, 0, -1, 0, 0, 1, 0, 0, 1, 0, 0, 0, -1, 0, -4, 1);
+	//prims.push_back(std::make_unique<Primitive>(light0, xfm_light));
+	//prims.push_back(std::make_unique<Primitive>(light1, xfm_light));
+	
+	//std::shared_ptr<Sphere> sphere = std::make_shared<Sphere>();
+	//Matrix44<float> xfm_sphere(.1, 0, 0, 0, 0, .1, 0, 0, 0, 0, .1, 0, 0, -1.2, -4, 1);
+	//prims.push_back(std::make_unique<Primitive>(sphere, material, xfm_sphere));
+
+	Matrix44<float> xfm_sphere(.2, 0, 0, 0, 0, .2, 0, 0, 0, 0, .2, 0, 0, 0, -4, 1);
+	std::shared_ptr<SphereLight> sphere_light = std::make_shared<SphereLight>(0, 1, 20);
+	prims.push_back(std::make_unique<Primitive>(sphere_light, xfm_sphere));
 
 	// once we have all prims we need to process them
 	size_t num_allocated_triangles = 0;
@@ -551,6 +781,7 @@ void Render() {
 	camera->cam_to_world_ = Matrix44<float>(0.827081, 0, -0.562083, 0, -0.152433, 0.962525, -0.224298, 0, 0.541019, 0.271192, 0.796086, 0, 2.924339, 1.020801, 0.511729, 1);
 	std::unique_ptr<Integrator> integrator = std::make_unique<Integrator>();
 	std::unique_ptr<unsigned char[]> framebuffer = std::make_unique<unsigned char[]>(3 * width * height); 
+	auto start = std::chrono::high_resolution_clock::now();
 	for (size_t y = 0; y < height; ++y) {
 		for (size_t x = 0; x < width; ++x) {
 			Ray primary;
@@ -561,6 +792,9 @@ void Render() {
 			framebuffer[(y * width + x) * 3 + 2] = std::clamp(L.z, 0.f, 1.f) * 255;
 		}
 	}
+	auto end = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> duration_seconds = end - start;
+	std::cout << "Time taken: " << duration_seconds.count() << " seconds" << std::endl;
 	std::ofstream ofs("./test.ppm", std::ios::binary);
 	ofs << "P6\n" << width << " " << height << "\n255\n";
 	ofs.write((char*)framebuffer.get(), 3 * width * height);

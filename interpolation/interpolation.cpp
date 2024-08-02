@@ -159,12 +159,12 @@ void TestBilinearInterpolation() {
  *
  */
 void TestTrilinearInterpolation() {
-    //
-    // Note that the size is gridSize ^ 3 and correspondingly, since we "upscale"
-    // in each dimension, you will have (gridSize * scale) ^ 3 for the output 
-    // image. In this particular example, the initial 3D grid is 8x8x8 and the
+	//
+	// Note that the size is gridSize ^ 3 and correspondingly, since we "upscale"
+	// in each dimension, you will have (gridSize * scale) ^ 3 for the output 
+	// image. In this particular example, the initial 3D grid is 8x8x8 and the
 	// upres grid is 128x128x128. 
-    //
+	//
     uint32_t grid_size = 8; // number of cells along any of x, y and z-axis
     uint32_t scale = 16;
 

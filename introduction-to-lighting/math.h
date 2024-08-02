@@ -1,5 +1,11 @@
+// (c) www.scratchapixel.com - 2024.
+// Distributed under the terms of the CC BY-NC-ND 4.0 License.
+// https://creativecommons.org/licenses/by-nc-nd/4.0/
+
 #ifndef _MATH_H_
 #define _MATH_H_
+
+#include <iomanip>
 
 template<typename T>
 class Vec2 {
@@ -119,6 +125,7 @@ using Box3f = Box<Vec3<float>>;
 template<typename T>
 class Matrix44 {
 public:
+	static const Matrix44<T> kIdentity;
 	constexpr Matrix44() noexcept {
 		x[0][0] = 1;
 		x[0][1] = 0;
@@ -149,6 +156,25 @@ public:
 	}
 	constexpr Matrix44(const T* m) {
 		std::memcpy(&x[0], m, sizeof(T) * 16);
+	}
+	constexpr Matrix44<T>& operator=(const Matrix44& v) noexcept {
+		x[0][0] = v.x[0][0];
+		x[0][1] = v.x[0][1];
+		x[0][2] = v.x[0][2];
+		x[0][3] = v.x[0][3];
+		x[1][0] = v.x[1][0];
+		x[1][1] = v.x[1][1];
+		x[1][2] = v.x[1][2];
+		x[1][3] = v.x[1][3];
+		x[2][0] = v.x[2][0];
+		x[2][1] = v.x[2][1];
+		x[2][2] = v.x[2][2];
+		x[2][3] = v.x[2][3];
+		x[3][0] = v.x[3][0];
+		x[3][1] = v.x[3][1];
+		x[3][2] = v.x[3][2];
+		x[3][3] = v.x[3][3];
+		return *this;
 	}
 	constexpr bool operator==(const Matrix44& rhs) const noexcept {
 		return x[0][0] == rhs.x[0][0] && x[0][1] == rhs.x[0][1] &&
@@ -191,8 +217,139 @@ public:
 	const T* operator[] (int i) const noexcept {
 		return x[i];
 	}
+	constexpr Matrix44<T> Transposed () const noexcept {
+		return Matrix44 (
+			x[0][0],
+			x[1][0],
+			x[2][0],
+			x[3][0],
+			x[0][1],
+			x[1][1],
+			x[2][1],
+			x[3][1],
+			x[0][2],
+			x[1][2],
+			x[2][2],
+			x[3][2],
+			x[0][3],
+			x[1][3],
+			x[2][3],
+			x[3][3]);
+	}
+	constexpr const Matrix44<T>& Invert() noexcept {
+		*this = Inverse();
+		return *this;
+	}
+	constexpr Matrix44<T> Inverse() const noexcept {
+		if (x[0][3] != 0 || x[1][3] != 0 || x[2][3] != 0 || x[3][3] != 1)
+			abort();
+			//	return gjInverse();
+
+		Matrix44 s (
+			x[1][1] * x[2][2] - x[2][1] * x[1][2],
+			x[2][1] * x[0][2] - x[0][1] * x[2][2],
+			x[0][1] * x[1][2] - x[1][1] * x[0][2],
+			0,
+
+			x[2][0] * x[1][2] - x[1][0] * x[2][2],
+			x[0][0] * x[2][2] - x[2][0] * x[0][2],
+			x[1][0] * x[0][2] - x[0][0] * x[1][2],
+			0,
+
+			x[1][0] * x[2][1] - x[2][0] * x[1][1],
+			x[2][0] * x[0][1] - x[0][0] * x[2][1],
+			x[0][0] * x[1][1] - x[1][0] * x[0][1],
+			0,
+
+			0,
+			0,
+			0,
+			1);
+
+		T r = x[0][0] * s.x[0][0] + x[0][1] * s.x[1][0] + x[0][2] * s.x[2][0];
+
+		if (std::abs(r) >= 1) {
+			for (int i = 0; i < 3; ++i) {
+				for (int j = 0; j < 3; ++j) {
+					s.x[i][j] /= r;
+				}
+			}
+		}
+		else {
+			T mr = std::abs (r) / std::numeric_limits<T>::min ();
+
+			for (int i = 0; i < 3; ++i) {
+				for (int j = 0; j < 3; ++j) {
+					if (mr > std::abs (s.x[i][j])) {
+						s.x[i][j] /= r;
+					}
+					else {
+						return Matrix44 ();
+					}
+				}
+			}
+		}
+
+		s.x[3][0] = -x[3][0] * s.x[0][0] - x[3][1] * s.x[1][0] - x[3][2] * s.x[2][0];
+		s.x[3][1] = -x[3][0] * s.x[0][1] - x[3][1] * s.x[1][1] - x[3][2] * s.x[2][1];
+		s.x[3][2] = -x[3][0] * s.x[0][2] - x[3][1] * s.x[1][2] - x[3][2] * s.x[2][2];
+
+		return s;
+	}
+	friend std::ostream& operator<< (std::ostream& s, const Matrix44<T>& m) {
+		std::ios_base::fmtflags oldFlags = s.flags();
+		int width;
+
+		if (s.flags() & std::ios_base::fixed) {
+			s.setf(std::ios_base::showpoint);
+			width = static_cast<int> (s.precision ()) + 5;
+		}
+		else {
+			s.setf(std::ios_base::scientific);
+			s.setf(std::ios_base::showpoint);
+			width = static_cast<int> (s.precision ()) + 8;
+		}
+
+		s << "(" << std::setw(width) << m[0][0] << " " << std::setw(width)
+		  << m[0][1] << " " << std::setw(width) << m[0][2] << " "
+		  << std::setw(width) << m[0][3] << "\n"
+		  <<
+
+			" " << std::setw(width) << m[1][0] << " " << std::setw(width)
+		  << m[1][1] << " " << std::setw(width) << m[1][2] << " "
+		  << std::setw(width) << m[1][3] << "\n"
+		  <<
+
+			" " << std::setw(width) << m[2][0] << " " << std::setw(width)
+		  << m[2][1] << " " << std::setw(width) << m[2][2] << " "
+		  << std::setw(width) << m[2][3] << "\n"
+		  <<
+
+			" " << std::setw(width) << m[3][0] << " " << std::setw(width)
+		  << m[3][1] << " " << std::setw(width) << m[3][2] << " "
+		  << std::setw(width) << m[3][3] << ")\n";
+
+		s.flags(oldFlags);
+		return s;
+	}
 public:
 	T x[4][4];
 };
+
+template<class T>
+void ExtractScaling(const Matrix44<T>& mat, Vec3<T>& scale) {
+	Vec3<T> row[3];
+
+    row[0] = Vec3<T>(mat[0][0], mat[0][1], mat[0][2]);
+    row[1] = Vec3<T>(mat[1][0], mat[1][1], mat[1][2]);
+    row[2] = Vec3<T>(mat[2][0], mat[2][1], mat[2][2]);
+
+	scale.x = row[0].Length();
+	scale.y = row[1].Length();
+	scale.z = row[2].Length();
+}
+
+template<typename T>
+const Matrix44<T> Matrix44<T>::kIdentity = Matrix44<T>();
 
 #endif

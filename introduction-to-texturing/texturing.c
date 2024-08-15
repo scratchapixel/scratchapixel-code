@@ -1,9 +1,14 @@
+// Copyright (C) 2024 www.scratchapixel.com
+// Distributed under the terms of the CC BY-NC-ND 4.0 License.
+// https://creativecommons.org/licenses/by-nc-nd/4.0/
+// clang -std=c11 -o texturing.exe  texturing.c -O3
+
 #define _CRT_SECURE_NO_WARNINGS
 
-#include <cstdlib>
-#include <cstdio>
+#include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
-#include <cassert>
+#include <assert.h>
 #include <math.h> // For fminf and fmaxf
 
 struct point2i { int x, y; };
@@ -21,50 +26,50 @@ struct image {
 
 struct shader {
 	union color {
-		color3f constant_value;
+		struct color3f constant_value;
 		struct image* image_ptr;
 	} color;
 };
 
 struct mesh {
-	point3f* points;
+	struct point3f* points;
 	//int* faceVertexCounts;
 	int* face_vertex_indices;
 	struct {
-		texcoord2f* coords;
+		struct texcoord2f* coords;
 		int* indices;
 	} st;
 	int num_triangles;
 	int num_points;
-	normal3f* normals;
+	struct normal3f* normals;
 
 	struct shader* shader;
 };
 
+struct extent {
+	int width;
+	int height;
+};
+
+struct screen_coordinates {
+	float r, l, t, b;
+};
+
 struct context {
-	struct extent {
-		int width;
-		int height;
-	} extent;
+	struct extent extent;
 	float focal_length;
 	struct aperture {
 		float width;
 		float height;
 	} aperture;
 	float znear, zfar;
-	struct screen_coordinates {
-		float r, l, t, b;
-	} screen_coordinates;
+	struct screen_coordinates screen_coordinates;
 	float* depth_buffer;
-	color3f* color_buffer;
-	float world_to_cam[16] = {
-		0.371368000,  0.0626859, -0.9263670, 0, 
-		0.000000000,  0.9977180,  0.0675142, 0, 
-		0.928486000, -0.0250726,  0.3705200, 0, 
-		0.000639866, -0.8131160, -7.4020440, 1};
+	struct color3f* color_buffer;
+	float world_to_cam[16];
 };
 
-static inline void point_mat_mult(const point3f* const p, const float* m, point3f* xp) {
+static inline void point_mat_mult(const struct point3f* const p, const float* m, struct point3f* xp) {
     float x = m[0] * p->x + m[4] * p->y + m[8] * p->z + m[12];
     float y = m[1] * p->x + m[5] * p->y + m[9] * p->z + m[13];
     float z = m[2] * p->x + m[6] * p->y + m[10] * p->z + m[14];
@@ -91,9 +96,9 @@ static void create_mesh(struct context* const context, struct mesh* const mesh) 
 	int num_faces = sizeof(faceVertexCounts) / sizeof(faceVertexCounts[0]);
 	mesh->num_points = sizeof(points) / sizeof(points[0]);
 	fprintf(stderr, "num points %d\n", mesh->num_points);
-	mesh->points = (point3f*)malloc(sizeof(points));
-	point3f* pts = mesh->points;
-	memcpy((char*)pts, points, mesh->num_points * sizeof(point3f));
+	mesh->points = (struct point3f*)malloc(sizeof(points));
+	struct point3f* pts = mesh->points;
+	memcpy((char*)pts, points, mesh->num_points * sizeof(struct point3f));
 	
 	for (int i = 0; i < mesh->num_points; ++i, ++pts) {
 		point_mat_mult(pts, context->world_to_cam, pts);
@@ -114,8 +119,8 @@ static void create_mesh(struct context* const context, struct mesh* const mesh) 
 	int tex_index_array_size = sizeof(indices) / sizeof(indices[0]);
 	int tex_coord_array_size = sizeof(st) / sizeof(st[0]);
 	
-	mesh->st.coords = (texcoord2f*)malloc(sizeof(st));
-	memcpy((char*)mesh->st.coords, st, tex_coord_array_size * sizeof(texcoord2f));
+	mesh->st.coords = (struct texcoord2f*)malloc(sizeof(st));
+	memcpy((char*)mesh->st.coords, st, tex_coord_array_size * sizeof(struct texcoord2f));
 
 	int vi[3], ti[3], index_offset = 0;
 	int* pvi = mesh->face_vertex_indices;
@@ -133,8 +138,8 @@ static void create_mesh(struct context* const context, struct mesh* const mesh) 
 		}
 		
 	}
-	mesh->shader = (shader*)malloc(sizeof(shader));
-	mesh->shader->color.image_ptr = (image*)malloc(sizeof(image));
+	mesh->shader = (struct shader*)malloc(sizeof(struct shader));
+	mesh->shader->color.image_ptr = (struct image*)malloc(sizeof(struct image));
 	mesh->shader->color.image_ptr->data = NULL;
 	set_texture(mesh->shader->color.image_ptr, "./pixar-texture3.pbm");
 }
@@ -153,13 +158,15 @@ static void destroy_mesh(struct mesh* mesh) {
 	free(mesh);
 }
 
-static const point2f sample_pattern[] = {{0.25, 0.25},{0.75, 0.25},{0.25, 0.75},{0.75, 0.75}};
+static const struct point2f sample_pattern[] = {{0.25, 0.25},{0.75, 0.25},{0.25, 0.75},{0.75, 0.75}};
 static const int num_samples = sizeof(sample_pattern) / sizeof(sample_pattern[0]);
 
 static void init(struct context* context) {
-	context->extent = {960, 540};
+	context->extent.width = 960;
+	context->extent.height = 540;
 	context->focal_length = 35;
-	context->aperture = {36.f, 24.f};
+	context->aperture.width = 36.f;
+	context->aperture.height = 24.f;
 	context->znear = 0.1;
 	context->zfar = 10;
 
@@ -178,27 +185,35 @@ static void init(struct context* context) {
 		context->screen_coordinates.l, context->screen_coordinates.r, 
 		context->screen_coordinates.t, context->screen_coordinates.b
 	);
+
+	float world_to_cam[16] = {
+		0.371368000,  0.0626859, -0.9263670, 0, 
+		0.000000000,  0.9977180,  0.0675142, 0, 
+		0.928486000, -0.0250726,  0.3705200, 0, 
+		0.000639866, -0.8131160, -7.4020440, 1};
+
+	memcpy(context->world_to_cam, world_to_cam, sizeof(world_to_cam));
 }
 
 static void prepare_buffers(struct context* context) {
 	int array_size = context->extent.width * context->extent.height;
 
 	context->depth_buffer = (float*)malloc(sizeof(float) * num_samples * array_size);
-	context->color_buffer = (color3f*)malloc(sizeof(color3f) * num_samples * array_size);
+	context->color_buffer = (struct color3f*)malloc(sizeof(struct color3f) * num_samples * array_size);
 
 	for (int i = 0; i < array_size * num_samples; ++i) {
-		context->color_buffer[i] = {0.18,0.18,0.18};
+		context->color_buffer[i].x = context->color_buffer[i].y = context->color_buffer[i].z = 0.18;
 		context->depth_buffer[i] = context->zfar;
 	}
 }
 
-static inline void persp_divide(point3f* p, const float& znear) {
+static inline void persp_divide(struct point3f* p, const float znear) {
 	p->x = p->x / -p->z * znear;
     p->y = p->y / -p->z * znear;
     p->z = -p->z;
 }
 
-static inline void to_raster(const struct context::screen_coordinates& coords, const struct context::extent& extent, point3f* p) {
+static inline void to_raster(const struct screen_coordinates coords, const struct extent extent, struct point3f* const p) {
 	p->x = 2 * p->x / (coords.r - coords.l) - (coords.r + coords.l) / (coords.r - coords.l);
 	p->y = 2 * p->y / (coords.t - coords.b) - (coords.t + coords.b) / (coords.t - coords.b);
 
@@ -207,26 +222,29 @@ static inline void to_raster(const struct context::screen_coordinates& coords, c
 	//p->z = 1 / p->z;
 }
 
-static inline void tri_bbox(const point3f* p0, const point3f* p1, const point3f* p2, float* const bbox) {
+static inline void tri_bbox(const struct point3f* const p0, 
+							const struct point3f* const p1, 
+							const struct point3f* const p2, 
+							float* const bbox) {
 	bbox[0] = fminf(fminf(p0->x, p1->x), p2->x); // Min x-coordinate
     bbox[1] = fminf(fminf(p0->y, p1->y), p2->y); // Min y-coordinate
     bbox[2] = fmaxf(fmaxf(p0->x, p1->x), p2->x); // Max x-coordinate
     bbox[3] = fmaxf(fmaxf(p0->y, p1->y), p2->y); // Max y-coordinate
 }
 
-static inline int min(int lo, int v) { return (lo < v) ? lo : v; }
-static inline int max(int hi, int v) { return (hi > v) ? hi : v; }
 static inline float mix(float a, float b, float t) { return a * (1 - t) + b * t; }
-static inline float edge(const point3f* const a, const point3f* const b, const point3f* const test) {
+static inline float edge(const struct point3f* const a, const struct point3f* const b, const struct point3f* const test) {
 	return (test->x - a->x) * (b->y - a->y) - (test->y - a->y) * (b->x - a->x);
 }
 
-static void shade(const struct shader* shader, texcoord2f st, color3f* ci) {
+static void shade(const struct shader* shader, struct texcoord2f st, struct color3f* ci) {
 	if (shader->color.image_ptr != NULL) {
-		const image* const image = shader->color.image_ptr;
-		point2i texel;
-		texel.x = (int)fminf(st.s * image->width, image->width - 1);
-		texel.y = (int)fminf((1 - st.t) * image->height, image->height - 1);
+		const struct image* const image = shader->color.image_ptr;
+		float s = st.s - floor(st.s);
+		float t = ceil(st.t) - st.t;
+		struct point2i texel;
+		texel.x = (int)fminf(s * image->width, image->width - 1);
+		texel.y = (int)fminf(t * image->height, image->height - 1);
 		unsigned char texel_color[3];
 		memcpy(texel_color, image->data + (texel.y * image->width + texel.x) * 3, 3);
 		ci->x = texel_color[0] / 255.f;
@@ -240,13 +258,13 @@ static void shade(const struct shader* shader, texcoord2f st, color3f* ci) {
 }
 
 static inline void rasterize(int x0, int y0, int x1, int y1, 
-							 const point3f* const p0, const point3f* const p1, const point3f* const p2, 
-							 const texcoord2f* const st0, const texcoord2f* const st1, const texcoord2f* const st2,
-							 const mesh* const mesh,
+							 const struct point3f* const p0, const struct point3f* const p1, const struct point3f* const p2, 
+							 const struct texcoord2f* const st0, const struct texcoord2f* const st1, const struct texcoord2f* const st2,
+							 const struct mesh* const mesh,
 							 struct context* context) {
 	float area = edge(p0, p1, p2);
 	float rcp_num_samples = 1.f / num_samples;
-	point3f pixel, sample;
+	struct point3f pixel, sample;
 	pixel.y = y0;
 	for (int j = y0, row = y0 * context->extent.width; j <= y1; ++j, pixel.y += 1, row += context->extent.width) {
 		pixel.x = x0;
@@ -267,7 +285,7 @@ static inline void rasterize(int x0, int y0, int x1, int y1,
 					if (z < context->depth_buffer[index * num_samples + k]) {
 						context->depth_buffer[index * num_samples + k] = z;
 
-						texcoord2f st;
+						struct texcoord2f st;
 						st.s = st0->s * w0 + st1->s * w1 + st2->s * w2;
 						st.t = st0->t * w0 + st1->t * w1 + st2->t * w2;
 						st.s *= z;
@@ -280,17 +298,17 @@ static inline void rasterize(int x0, int y0, int x1, int y1,
 	}
 }
 
-void render(struct context* context, int num_meshes, const mesh** const meshes) {
+void render(struct context* context, int num_meshes, const struct mesh** const meshes) {
 	float bbox[4];
 	int x0, x1, y0, y1;
 	for (int i = 0; i < num_meshes; ++i) {
-		const mesh* const mesh = meshes[i];
+		const struct mesh* const mesh = meshes[i];
 		const int* vi = mesh->face_vertex_indices;
 		const int* sti = mesh->st.indices;
 		for (int j = 0; j < mesh->num_triangles; ++j, vi += 3, sti += 3) {
-			point3f p0 = mesh->points[vi[0]];
-			point3f p1 = mesh->points[vi[1]];
-			point3f p2 = mesh->points[vi[2]];
+			struct point3f p0 = mesh->points[vi[0]];
+			struct point3f p1 = mesh->points[vi[1]];
+			struct point3f p2 = mesh->points[vi[2]];
 			persp_divide(&p0, context->znear);
 			persp_divide(&p1, context->znear);
 			persp_divide(&p2, context->znear);
@@ -305,9 +323,9 @@ void render(struct context* context, int num_meshes, const mesh** const meshes) 
 			x1 = min(context->extent.width - 1, (int)bbox[2]);
 			y1 = min(context->extent.width - 1, (int)bbox[3]);
 			
-			texcoord2f st0 = mesh->st.coords[sti[0]];
-			texcoord2f st1 = mesh->st.coords[sti[1]];
-			texcoord2f st2 = mesh->st.coords[sti[2]];
+			struct texcoord2f st0 = mesh->st.coords[sti[0]];
+			struct texcoord2f st1 = mesh->st.coords[sti[1]];
+			struct texcoord2f st2 = mesh->st.coords[sti[2]];
 			st0.s /= p0.z, st0.t /= p0.z;
 			st1.s /= p1.z, st1.t /= p1.z;
 			st2.s /= p2.z, st2.t /= p2.z;
@@ -325,19 +343,19 @@ void cleanup(struct context* context) {
 static inline float remap(float val, float lo, float hi) { return (val - lo) / (hi - lo); }
 
 int main() {
-	context context;
+	struct context context;
 	init(&context);
 	prepare_buffers(&context);
 
 	int num_meshes = 2;
-	mesh** meshes = (mesh**)malloc(sizeof(mesh*) * num_meshes);
+	struct mesh** meshes = (struct mesh**)malloc(sizeof(struct mesh*) * num_meshes);
 	for (int i = 0; i < num_meshes; ++i) {
-		meshes[i] = (mesh*)malloc(sizeof(mesh));
+		meshes[i] = (struct mesh*)malloc(sizeof(struct mesh));
 	}
 	
 	create_mesh(&context, meshes[0]);
 
-	render(&context, 1, (const mesh** const)meshes);
+	render(&context, 1, (const struct mesh** const)meshes);
 	
 	float min = 0.1;
 	float max = 10;
@@ -371,7 +389,7 @@ int main() {
 	file = fopen("./color.ppm", "wb");
 	fprintf(file, "P6\n%d %d\n255\n", context.extent.width, context.extent.height);
 	for (int i = 0; i < context.extent.width * context.extent.height * 4; i += 4) {
-		color3f accum = {0,0,0};
+		struct color3f accum = {0,0,0};
 		for (int j = 0; j < 4; ++j) {
 			accum.x += context.color_buffer[i + j].x;
 			accum.y += context.color_buffer[i + j].y;

@@ -1,31 +1,7 @@
-//[header]
-// A simple program that uses ray-tracing to render a single triangle
-//[/header]
-//[compile]
-// Download the raytri.cpp and geometry.h files to a folder.
-// Open a shell/terminal, and run the following command where the files is saved:
-//
-// c++ -o raytri raytri.cpp -O3 -std=c++11 -DMOLLER_TRUMBORE
-//
-// Run with: ./raytri. Open the file ./out.png in Photoshop or any program
-// reading PPM files.
-//[/compile]
-//[ignore]
-// Copyright (C) 2012  www.scratchapixel.com
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//[/ignore]
+// Copyright (C) 2009-2024 www.scratchapixel.com
+// Distributed under the terms of the CC BY-NC-ND 4.0 License.
+// https://creativecommons.org/licenses/by-nc-nd/4.0/
+// clang++ -o raytri.exe raytri.cpp -O3 -std=c++23 (optional: -DMOLLER_TRUMBORE)
 
 // needed on Windows
 #define _USE_MATH_DEFINES
@@ -54,21 +30,16 @@ inline
 float clamp(const float &lo, const float &hi, const float &v)
 { return std::max(lo, std::min(hi, v)); }
 
-// [comment]
-// The main ray-triangle intersection routine. You can test both methoods: the
-// geometric method and the Moller-Trumbore algorithm (use the flag -DMOLLER_TRUMBORE
-// when you compile.
-// [/comment]
 bool rayTriangleIntersect(
     const Vec3f &orig, const Vec3f &dir,
     const Vec3f &v0, const Vec3f &v1, const Vec3f &v2,
     float &t, float &u, float &v)
 {
 #ifdef MOLLER_TRUMBORE
-    Vec3f v0v1 = v1 - v0;
-    Vec3f v0v2 = v2 - v0;
-    Vec3f pvec = dir.crossProduct(v0v2);
-    float det = v0v1.dotProduct(pvec);
+    Vec3f e0 = v0 - v2;
+    Vec3f e1 = v1 - v2;
+    Vec3f pvec = dir.crossProduct(e1);
+    float det = e0.dotProduct(pvec);
 #ifdef CULLING
     // if the determinant is negative the triangle is backfacing
     // if the determinant is close to 0, the ray misses the triangle
@@ -79,23 +50,23 @@ bool rayTriangleIntersect(
 #endif
     float invDet = 1 / det;
 
-    Vec3f tvec = orig - v0;
+    Vec3f tvec = orig - v2;
     u = tvec.dotProduct(pvec) * invDet;
     if (u < 0 || u > 1) return false;
 
-    Vec3f qvec = tvec.crossProduct(v0v1);
+    Vec3f qvec = tvec.crossProduct(e0);
     v = dir.dotProduct(qvec) * invDet;
     if (v < 0 || u + v > 1) return false;
     
-    t = v0v2.dotProduct(qvec) * invDet;
+    t = e1.dotProduct(qvec) * invDet;
     
     return true;
 #else
     // compute plane's normal
-    Vec3f v0v1 = v1 - v0;
-    Vec3f v0v2 = v2 - v0;
+    Vec3f e0 = v2 - v1;
+    Vec3f e1 = v0 - v2;
     // no need to normalize
-    Vec3f N = v0v1.crossProduct(v0v2); // N
+    Vec3f N = e0.crossProduct(e1); // N
     float denom = N.dotProduct(N);
     
     // Step 1: finding P
@@ -121,23 +92,20 @@ bool rayTriangleIntersect(
     // Step 2: inside-outside test
     Vec3f C; // vector perpendicular to triangle's plane
  
-    // edge 0
-    Vec3f edge0 = v1 - v0; 
-    Vec3f vp0 = P - v0;
-    C = edge0.crossProduct(vp0);
+	// Calculate u (for triangle BCP)
+    Vec3f v1p = P - v1;
+    C = e0.crossProduct(v1p);
+	if ((u = N.dotProduct(C)) < 0) return false; // P is on the right side
+ 
+    // Calculate v (for triangle CAP)
+    Vec3f v2p = P - v2;
+    C = e1.crossProduct(v2p);
+    if ((v = N.dotProduct(C)) < 0) return false; // P is on the right side
+
+    Vec3f e2 = v1 - v0;
+    Vec3f v0p = P - v0;
+    C = e2.crossProduct(v0p);
     if (N.dotProduct(C) < 0) return false; // P is on the right side
- 
-    // edge 1
-    Vec3f edge1 = v2 - v1; 
-    Vec3f vp1 = P - v1;
-    C = edge1.crossProduct(vp1);
-    if ((u = N.dotProduct(C)) < 0)  return false; // P is on the right side
- 
-    // edge 2
-    Vec3f edge2 = v0 - v2; 
-    Vec3f vp2 = P - v2;
-    C = edge2.crossProduct(vp2);
-    if ((v = N.dotProduct(C)) < 0) return false; // P is on the right side;
 
     u /= denom;
     v /= denom;
@@ -148,13 +116,14 @@ bool rayTriangleIntersect(
 
 int main(int argc, char **argv)
 {
-    Vec3f v0(-1, -1, -5);
+    Vec3f v0(-2, -1, -5);
     Vec3f v1( 1, -1, -5);
     Vec3f v2( 0,  1, -5);
     
     const uint32_t width = 640;
     const uint32_t height = 480;
-    Vec3f cols[3] = {{0.6, 0.4, 0.1}, {0.1, 0.5, 0.3}, {0.1, 0.3, 0.7}};
+	// v0 is yellow, v1 is cyan and v2 is magenta
+    Vec3f cols[3] = {{1.f, 1.f, 0.f}, {0, 1.f, 1.f}, {1.f, 0.f, 1.f}};
     Vec3f *framebuffer = new Vec3f[width * height];
     Vec3f *pix = framebuffer;
     float fov = 51.52;
@@ -170,12 +139,9 @@ int main(int argc, char **argv)
             dir.normalize();
             float t, u, v;
             if (rayTriangleIntersect(orig, dir, v0, v1, v2, t, u, v)) {
-                // [comment]
-                // Interpolate colors using the barycentric coordinates
-                // [/comment]
                 *pix = u * cols[0] + v * cols[1] + (1 - u - v) * cols[2];
                 // uncomment this line if you want to visualize the row barycentric coordinates
-                //*pix = Vec3f(u, v, 1 - u - v);
+                *pix = Vec3f(u, v, 1 - u - v);
             }
             pix++;
         }

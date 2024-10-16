@@ -1,7 +1,7 @@
 // (c) scratchapixel - 2024
 // Distributed under the terms of the CC BY-NC-ND 4.0 License.
 // https://creativecommons.org/licenses/by-nc-nd/4.0/
-// clang++ -std=c++23 -Wall -Wextra -std=c++23 -luser32 -lgdi32 -o 3d-nav-controls.exe 3d-nav-controls.cc -O3
+// clang++ -std=c++23 -Wall -Wextra -luser32 -lgdi32 -o 3d-nav-controls.exe 3d-nav-controls.cc -O3
 
 #define _USE_MATH_DEFINES
 #include <cmath>
@@ -233,9 +233,9 @@ enum EventFlags {
 	EF_RIGHT_BUTTON_DOWN	= 1 << 5
 };
 
-void OnMousePressed(EventType type, int flags, gfx::Point location) {
+void OnMousePressed(int flags, gfx::Point location) {
 	freecam_model.mouse_pos = location;
-	if (type == ET_MOUSE_PRESSED && flags & EF_ALT_DOWN) {
+	if (flags & EF_ALT_DOWN) {
 		freecam_model.move_type =
 			(flags & EF_LEFT_BUTTON_DOWN) ? FreeCameraModel::CameraMoveType::TUMBLE :
 			(flags & EF_MIDDLE_BUTTON_DOWN) ? FreeCameraModel::CameraMoveType::TRACK :
@@ -448,10 +448,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 		case WM_LBUTTONDOWN:
 		case WM_MBUTTONDOWN:
 		case WM_RBUTTONDOWN: {
-				EventType type = (msg == WM_LBUTTONDOWN || msg == WM_MBUTTONDOWN || msg == WM_RBUTTONDOWN) 
-					? EventType::ET_MOUSE_PRESSED 
-					: EventType::ET_MOUSE_RELEASED;
-
 				gfx::Point location(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
 
 				unsigned int flags = 0;
@@ -462,7 +458,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 				if (wParam & MK_MBUTTON) flags |= EF_MIDDLE_BUTTON_DOWN;
 				if (wParam & MK_RBUTTON) flags |= EF_RIGHT_BUTTON_DOWN;
 
-				OnMousePressed(type, flags, location);
+				OnMousePressed(flags, location);
 				Render();
 			}
 			break;
@@ -474,7 +470,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 			}
 			break;
 		case WM_MOUSEWHEEL: {
-				int delta = GET_WHEEL_DELTA_WPARAM(wParam) / WHEEL_DELTA;;
+				int delta = GET_WHEEL_DELTA_WPARAM(wParam) / WHEEL_DELTA;
 				OnMouseWheel(delta);
 				Render();
 			} 

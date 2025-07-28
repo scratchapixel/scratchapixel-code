@@ -33,6 +33,7 @@
 #include <iostream>
 #include <iomanip>
 #include <cmath>
+#include <cstdint>
 
 template<typename T>
 class Vec2
